@@ -20,11 +20,6 @@ contract Demurrage {
     uint256 private constant DEMURRAGE_WINDOW = 1 days;
 
     /**
-     * @dev Maximum value that can be stored or transferred
-     */
-    uint256 internal constant MAX_VALUE = type(uint192).max;
-
-    /**
      * @dev Reduction factor GAMMA for applying demurrage to balances
      *   demurrage_balance(d) = GAMMA^d * inflationary_balance
      * where 'd' is expressed in days (DEMURRAGE_WINDOW) since demurrage_day_zero,
@@ -48,7 +43,7 @@ contract Demurrage {
      * or midnight prior of the same day of deployment, marking the start of the first day
      * where there was no inflation on one CRC per hour.
      */
-    uint256 internal constant inflationDayZero = 1602720000;
+    uint256 internal constant INFLATION_DAY_ZERO = 1602720000;
 
     // Internal functions
 
@@ -59,7 +54,7 @@ contract Demurrage {
     function day(uint256 _timestamp) internal pure returns (uint64) {
         // calculate which day the timestamp is in, rounding down
         // note: max uint64 is 2^64 - 1, so we can safely cast the result
-        return uint64((_timestamp - inflationDayZero) / DEMURRAGE_WINDOW);
+        return uint64((_timestamp - INFLATION_DAY_ZERO) / DEMURRAGE_WINDOW);
     }
 
     /**
