@@ -17,4 +17,5 @@ interface IHub is IHubV2 {
     function registerOrganization(string calldata _name, bytes32 _metadataDigest) external;
     function trust(address _trustReceiver, uint96 _expiry) external;
     function registerHuman(address _inviter, bytes32 _metadataDigest) external;
+    function isTrusted(address _truster, address _trustee) external view returns (bool);
 }

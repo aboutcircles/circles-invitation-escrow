@@ -45,6 +45,9 @@ contract InvitationEscrow is Demurrage {
     /// @notice Thrown when attempting to redeem or revoke an invitation that does not exist.
     error InvalidEscrow();
 
+    /// @notice Thrown when trust from inviter to invitee is not present.
+    error MissingOrExpiredTrust();
+
     /*//////////////////////////////////////////////////////////////
                              Events
     //////////////////////////////////////////////////////////////*/
@@ -149,6 +152,8 @@ contract InvitationEscrow is Demurrage {
         DiscountedBalance memory discountedBalance = escrowedAmounts[inviter][msg.sender];
 
         if (discountedBalance.balance == 0) revert InvalidEscrow();
+
+        if (!HUB_V2.isTrusted(inviter, msg.sender)) revert MissingOrExpiredTrust();
 
         address prevInviter = invitationLinkedList[msg.sender][SENTINEL];
 
@@ -259,6 +264,8 @@ contract InvitationEscrow is Demurrage {
 
         // Ensure no existing escrow between inviter and invitee
         if (escrowedAmounts[inviter][invitee].balance != 0) revert InviteAlreadyEscrowed();
+
+        if (!HUB_V2.isTrusted(inviter, invitee)) revert MissingOrExpiredTrust();
 
         // Record the escrowed DiscountedBalance with current day
         uint64 day = day(block.timestamp);
@@ -417,10 +424,14 @@ contract InvitationEscrow is Demurrage {
         if (previous == address(0) || previous == SENTINEL) return inviteesOrInviters;
 
         assembly {
-            // Calculate the storage slot for invitationLinkedList[inviterOrInvitee]
+            // Calculate and store the storage slot for invitationLinkedList[inviterOrInvitee]
             mstore(0, inviterOrInvitee)
             mstore(0x20, invitationLinkedList.slot)
-            let inviterOrInviteeSlot := keccak256(0, 0x40)
+            mstore(0x20, keccak256(0, 0x40))
+            // Store the array at the free memory location
+            inviteesOrInviters := mload(0x40)
+            // Update free memory pointer
+            mstore(0x40, add(mload(0x40), 0x20))
             // Start with the first node from solidity
             let inviteeOrInviter := previous
             // While inviteeOrInviter != SENTINEL
@@ -434,7 +445,6 @@ contract InvitationEscrow is Demurrage {
 
                 // Compute the storage slot of invitationLinkedList[inviterOrInvitee][inviteeOrInviter]
                 mstore(0, inviteeOrInviter)
-                mstore(0x20, inviterOrInviteeSlot)
                 let nextSlot := keccak256(0, 0x40)
 
                 // Move to next node

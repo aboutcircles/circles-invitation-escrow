@@ -45,6 +45,8 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
         console.log(invitees.length);
         bytes memory data = abi.encode(INVITEE_1);
         vm.prank(INVITER_1);
+        HUB_V2.trust(INVITEE_1, type(uint96).max);
+        vm.prank(INVITER_1);
         HUB_V2.safeTransferFrom(INVITER_1, address(invitationEscrow), uint256(uint160(INVITER_1)), 100 ether, data);
 
         inviters = invitationEscrow.getInviters(INVITEE_1);
