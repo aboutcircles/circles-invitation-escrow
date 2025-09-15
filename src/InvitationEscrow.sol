@@ -163,6 +163,7 @@ contract InvitationEscrow is Demurrage {
             prevInviter = invitationLinkedList[msg.sender][prevInviter];
 
             uint256 amount = _revokeInvitation(currInviter, msg.sender);
+            amount = _capToHubBalance(currInviter, amount);
             if (currInviter != inviter) {
                 // Transfer wrapped ERC20 (demurrage) back to other inviters
                 _wrapAndTransfer(currInviter, amount);
@@ -186,6 +187,7 @@ contract InvitationEscrow is Demurrage {
      */
     function revokeInvitation(address invitee) external {
         uint256 amount = _revokeInvitation(msg.sender, invitee);
+        amount = _capToHubBalance(msg.sender, amount);
         // Wrap and transfer the demurrage amount in ERC20 form back to the inviter
         _wrapAndTransfer(msg.sender, amount);
 
@@ -203,16 +205,17 @@ contract InvitationEscrow is Demurrage {
         if (prevInvitee == address(0) || prevInvitee == SENTINEL) return;
 
         uint256 amount;
+        uint256 balance = _capToHubBalance(msg.sender, type(uint256).max);
         while (prevInvitee != SENTINEL) {
             address invitee = prevInvitee;
             // next invitee
             prevInvitee = invitationLinkedList[msg.sender][prevInvitee];
             uint256 revokedAmount = _revokeInvitation(msg.sender, invitee);
+            if (balance < revokedAmount) revokedAmount = balance;
+            balance -= revokedAmount;
             amount += revokedAmount;
-
             emit InvitationRevoked(msg.sender, invitee, revokedAmount);
         }
-
         // Transfer the total wrapped ERC20 to the inviter
         _wrapAndTransfer(msg.sender, amount);
     }
@@ -318,6 +321,7 @@ contract InvitationEscrow is Demurrage {
         DiscountedBalance memory discountedBalance = escrowedAmounts[inviter][invitee];
         days_ = day(block.timestamp) - discountedBalance.lastUpdatedDay;
         escrowedAmount = _calculateDiscountedBalance(discountedBalance.balance, days_);
+        escrowedAmount = _capToHubBalance(inviter, escrowedAmount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -348,6 +352,19 @@ contract InvitationEscrow is Demurrage {
         amount = _calculateDiscountedBalance(
             discountedBalance.balance, day(block.timestamp) - discountedBalance.lastUpdatedDay
         );
+    }
+
+    /**
+     * @notice Returns the amount capped to this contract's Hub balance for a specific inviter.
+     * @dev Compares the requested `amount` with the Hub balance for `inviter`
+     *      and returns the smaller of the two values.
+     * @param inviter The inviter address used to query the Hub balance.
+     * @param amount The requested amount to check against the Hub balance.
+     * @return cappedAmount The amount limited by the Hub balance (min(amount, hubBalance)).
+     */
+    function _capToHubBalance(address inviter, uint256 amount) internal view returns (uint256 cappedAmount) {
+        uint256 balance = HUB_V2.balanceOf(address(this), uint256(uint160(inviter)));
+        cappedAmount = balance < amount ? balance : amount;
     }
 
     /**
