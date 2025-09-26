@@ -16,14 +16,17 @@ import {MockReentrantReceiver} from "./mock/MockReentrantReceiver.sol";
 ///      1. nonReentrant modifier: if tload(0) { revert(0, 0) }
 ///      2. _removeInvitation: if (previousElement == address(0)) {
 contract InvitationEscrowTest is Test, HubStorageWrites {
-
-
-
+    /// @notice Struct containing balance information for testing escrow and Hub interactions
+    /// @dev Aggregates all relevant balance data for comprehensive testing scenarios
     struct HubAndEscrowBalances {
-        uint256 discountedBalance; // escrowBalance[inviter][invitee]
+        /// @notice Discounted balance stored in escrow mapping escrowBalance[inviter][invitee]
+        uint256 discountedBalance;
+        /// @notice Last day the balance was updated in Hub's time system
         uint64 lastUpdatedDay;
-        uint256 hubEscrowBalance; // HUB_V2.balanceOf(escrow, id)
-        uint256 hubAccountBalance; // HUB_V2.balanceOf(id, id)
+        /// @notice Hub balance of escrow contract for the inviter's token ID
+        uint256 hubEscrowBalance;
+        /// @notice Hub balance of inviter's own account for their token ID
+        uint256 hubAccountBalance;
     }
 
     /// @notice Fork ID for Gnosis chain testing
@@ -35,6 +38,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
     /// @notice Circles Hub V2 contract on Gnosis chain
     IHub public constant HUB_V2 = IHub(0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8);
 
+    /// @notice ERC20 Lift contract interface for Circles token operations
     IERC20Lift public constant LIFTERC20 = IERC20Lift(0x5F99a795dD2743C36D63511f0D4bc667e6d3cDB5);
 
     /// @notice Sentinel address used in linked list operations
@@ -43,6 +47,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
     /// @notice Current day in Hub's time system
     uint64 internal TODAY;
 
+    /// @notice Standard invitation cost in CRC tokens (96 CRC)
     uint256 internal constant INVITATION_COST = 96 ether;
 
     /// @notice Refer to InvitationEscrowed event in InvitationEscrow.sol
@@ -51,19 +56,23 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
     /// @notice Refer to InvitationRedeemed event in InvitationEscrow.sol
     event InvitationRedeemed(address indexed inviter, address indexed invitee, uint256 indexed amount);
 
+    /// @notice Refer to InvitationRefunded event in InvitationEscrow.sol
     event InvitationRefunded(address indexed inviter, address indexed invitee, uint256 indexed amount);
 
     /// @notice Refer to InvitationRevoked event in InvitationEscrow.sol
     event InvitationRevoked(address indexed inviter, address indexed invitee, uint256 indexed amount);
 
+    /// @notice Refer to ERC1155InsufficientBalance error in IERC20Errors
     error ERC1155InsufficientBalance(address sender, uint256 balance, uint256 needed, uint256 tokenId);
-    /// @notice Sets up test environment with Gnosis fork and contract deployment
-    /// @dev Creates a fork of Gnosis chain, deploys InvitationEscrow contract, and initializes test dependencies
 
+    /// @notice Refer to ERC1155InvalidReceiver error in IERC20Errors
     error ERC1155InvalidReceiver(address receiver);
 
+    /// @notice Mock contract for testing reentrancy protection
     MockReentrantReceiver mockReentrantReceiver;
 
+    /// @notice Sets up test environment with Gnosis fork and contract deployment
+    /// @dev Creates a fork of Gnosis chain, deploys InvitationEscrow contract, and initializes test dependencies
     function setUp() public {
         console.log(address(this));
         // Fork from Gnosis
@@ -76,12 +85,16 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
         mockReentrantReceiver = new MockReentrantReceiver(address(invitationEscrow));
     }
 
+    /*//////////////////////////////////////////////////////////////
+                         External function
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Fuzz test for ERC1155 token reception and invitation creation
     /// @dev Tests comprehensive validation scenarios including access control, amount limits, encoding validation, and trust requirements
     /// @param inviterId The token ID representing the inviter's identity
     /// @param value The CRC amount to be escrowed for the invitation
     /// @param inviteeId The address ID of the intended invitation recipient
-    function testFuzzERC1155Received(uint160 inviterId, uint192 value, uint160 inviteeId) public {
+    function testFuzz_onERC1155Received(uint160 inviterId, uint192 value, uint160 inviteeId) public {
         address inviter = address(uint160(inviterId));
         address invitee = address(uint160(inviteeId));
         vm.assume(
@@ -200,7 +213,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             vm.stopPrank();
 
             // Ensure inviter is an EOA
-            // invitee address can be invitationEscrow
+            // invitee address can be invitationEscrow, but will revert later
 
             vm.assume(inviter.code.length == 0);
 
@@ -259,7 +272,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
     /// @param inviteeId Token ID of the invitation recipient
     /// @param _day1 First time period for trust expiration testing
     /// @param _day2 Second time period for trust expiration testing
-    function testFuzz____RedeemInvitation(
+    function testFuzz_RedeemInvitation(
         uint160 inviter1Id,
         uint160 inviter2Id,
         uint160 inviteeId,
@@ -319,7 +332,8 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             snapShot = vm.snapshot();
             inviters = invitationEscrow.getInviters(invitee);
             assertEq(inviters.length, 1);
-            vm.warp(block.timestamp + _day2 * 1 days); // warp 1
+            // ================ warp =====================
+            vm.warp(block.timestamp + _day2 * 1 days);
 
             vm.prank(invitee);
             vm.expectRevert(InvitationEscrow.MissingOrExpiredTrust.selector);
@@ -368,12 +382,12 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
 
             vm.stopPrank();
 
-            vm.warp(block.timestamp + _day2 * 1 days); //warp 2
+            // ================ warp =====================
+            vm.warp(block.timestamp + _day2 * 1 days);
+
             //  inviter1's trust has expired
             HubAndEscrowBalances memory inviter1inviteeBefore = _getHubEscrowBalance(inviter1, invitee);
             HubAndEscrowBalances memory inviter2inviteeBefore = _getHubEscrowBalance(inviter2, invitee);
-
-            // pre condition
 
             vm.prank(invitee);
             vm.expectEmit();
@@ -432,36 +446,36 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
     /// @notice Fuzz test for single invitation revocation
     /// @dev Tests invitation revocation mechanics, linked list management, and demurrage calculations
     /// @dev Uncovered branch: if (previousElement == address(0)) returns
-    /// @param inviter1Id Token ID of the inviter revoking the invitation
+    /// @param inviterId Token ID of the inviter revoking the invitation
     /// @param inviteeId Token ID of the invitation recipient
     /// @param _days Number of days to simulate for demurrage testing
-    function testFuzzRevokeInvitation(uint160 inviter1Id, uint160 inviteeId, uint256 _days) public {
-        address inviter1 = address(uint160(inviter1Id));
+    function testFuzz_RevokeInvitation(uint160 inviterId, uint160 inviteeId, uint256 _days) public {
+        address inviter = address(uint160(inviterId));
         address invitee = address(uint160(inviteeId));
 
         vm.assume(_days < 100 * 365);
         vm.assume(
-            inviter1 != SENTINEL && invitee != SENTINEL && inviter1 != address(HUB_V2) && inviter1 != address(0)
-                && inviter1 != address(invitationEscrow)
+            inviter != SENTINEL && invitee != SENTINEL && inviter != address(HUB_V2) && inviter != address(0)
+                && inviter != address(invitationEscrow)
         );
 
-        if (invitee == address(0) || invitee == address(HUB_V2) || invitee == SENTINEL || inviter1 == invitee) {
-            vm.prank(inviter1);
+        if (invitee == address(0) || invitee == address(HUB_V2) || invitee == SENTINEL || inviter == invitee) {
+            vm.prank(inviter);
             vm.expectRevert(InvitationEscrow.InvalidEscrow.selector);
             invitationEscrow.revokeInvitation(invitee);
             return;
         }
 
         uint192 value = 100 ether;
-        _registerHuman(inviter1);
-        _setCRCBalance(inviter1Id, inviter1, HUB_V2.day(block.timestamp), value);
+        _registerHuman(inviter);
+        _setCRCBalance(inviterId, inviter, HUB_V2.day(block.timestamp), value);
 
-        vm.startPrank(inviter1);
+        vm.startPrank(inviter);
         HUB_V2.trust(invitee, type(uint96).max);
-        assertTrue(HUB_V2.isTrusted(inviter1, invitee));
-        HUB_V2.safeTransferFrom(inviter1, address(invitationEscrow), uint256(inviter1Id), value, abi.encode(invitee));
+        assertTrue(HUB_V2.isTrusted(inviter, invitee));
+        HUB_V2.safeTransferFrom(inviter, address(invitationEscrow), uint256(inviterId), value, abi.encode(invitee));
 
-        HubAndEscrowBalances memory inviter1inviteeBalance = _getHubEscrowBalance(inviter1, invitee);
+        HubAndEscrowBalances memory inviter1inviteeBalance = _getHubEscrowBalance(inviter, invitee);
         address[] memory inviters;
         address[] memory invitees;
         {
@@ -472,40 +486,44 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
 
             inviters = invitationEscrow.getInviters(invitee);
             assertEq(inviters.length, 1);
-            assertEq(inviters[0], inviter1);
-            invitees = invitationEscrow.getInvitees(inviter1);
+            assertEq(inviters[0], inviter);
+            invitees = invitationEscrow.getInvitees(inviter);
             assertEq(invitees.length, 1);
             assertEq(invitees[0], invitee);
         }
 
+        // ================ warp =====================
         vm.warp(block.timestamp + _days * 1 days);
-        HubAndEscrowBalances memory inviter1inviteeAfter = _getHubEscrowBalance(inviter1, invitee);
+
+        HubAndEscrowBalances memory inviter1inviteeAfter = _getHubEscrowBalance(inviter, invitee);
 
         if (inviter1inviteeAfter.discountedBalance == 0) {
-            vm.prank(inviter1);
+            vm.prank(inviter);
             vm.expectRevert(InvitationEscrow.InvalidEscrow.selector);
             invitationEscrow.revokeInvitation(invitee);
         } else {
-            vm.startPrank(inviter1);
+            vm.startPrank(inviter);
             vm.expectEmit();
-            emit InvitationRevoked(inviter1, invitee, inviter1inviteeAfter.discountedBalance);
+            emit InvitationRevoked(inviter, invitee, inviter1inviteeAfter.discountedBalance);
             invitationEscrow.revokeInvitation(invitee);
+
+            // Should revert when revoke twice
             vm.expectRevert(InvitationEscrow.InvalidEscrow.selector);
             invitationEscrow.revokeInvitation(invitee);
             vm.stopPrank();
         }
 
-        address demurrageCircleInviter1 = LIFTERC20.erc20Circles(CirclesType.Demurrage, inviter1);
+        address demurrageCircleInviter1 = LIFTERC20.erc20Circles(CirclesType.Demurrage, inviter);
         DiscountedBalance memory discountedBalanceERC20 =
-            IDemurrageCircles(demurrageCircleInviter1).discountedBalances(inviter1);
+            IDemurrageCircles(demurrageCircleInviter1).discountedBalances(inviter);
 
         assertEq(inviter1inviteeAfter.discountedBalance, discountedBalanceERC20.balance);
-        assertEq(inviter1inviteeAfter.hubEscrowBalance, discountedBalanceERC20.balance); // TODO: check why this is true, because escrow should be 0, and wrapper has the ERC1155, inviter has the wrapped ERC20
+        assertEq(inviter1inviteeAfter.hubEscrowBalance, discountedBalanceERC20.balance);
         assertEq(inviter1inviteeAfter.hubAccountBalance, 0);
         assertEq(inviter1inviteeAfter.lastUpdatedDay, _days);
         inviters = invitationEscrow.getInviters(invitee);
         assertEq(inviters.length, 0);
-        invitees = invitationEscrow.getInvitees(inviter1);
+        invitees = invitationEscrow.getInvitees(inviter);
         assertEq(invitees.length, 0);
     }
 
@@ -516,7 +534,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
     /// @param invitee2Id Token ID of the second invitation recipient
     /// @param _day1 First time period for staggered invitation creation
     /// @param _day2 Second time period for demurrage calculation testing
-    function testFuzz___RevokeAllInvitation(uint160 inviteeId, uint160 invitee2Id, uint64 _day1, uint64 _day2) public {
+    function testFuzz_RevokeAllInvitation(uint160 inviteeId, uint160 invitee2Id, uint64 _day1, uint64 _day2) public {
         address inviter = makeAddr("inviter");
         address invitee = address(uint160(inviteeId));
         address invitee2 = address(uint160(invitee2Id));
@@ -545,7 +563,9 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             emit InvitationEscrowed(inviter, invitee, value);
             HUB_V2.safeTransferFrom(inviter, address(invitationEscrow), uint256(inviterId), value, abi.encode(invitee));
 
+            // ================ warp =====================
             vm.warp(block.timestamp + _day1 * 1 days);
+
             _setCRCBalance(inviterId, inviter, HUB_V2.day(block.timestamp), value);
 
             HUB_V2.trust(invitee2, type(uint96).max);
@@ -562,7 +582,8 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             assertEq(invitees[1], invitee);
         }
 
-        vm.warp(block.timestamp + _day2 * 1 days);  // warp 2
+        // ================ warp =====================
+        vm.warp(block.timestamp + _day2 * 1 days);
 
         // Check the pre condition
 
@@ -570,15 +591,19 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
         HubAndEscrowBalances memory inviterinvitee2BalanceBefore = _getHubEscrowBalance(inviter, invitee2);
 
         assertEq(inviterinviteeBalanceBefore.hubEscrowBalance, inviterinvitee2BalanceBefore.hubEscrowBalance);
-        assertApproxEqAbs(inviterinviteeBalanceBefore.hubEscrowBalance, inviterinviteeBalanceBefore.discountedBalance + inviterinvitee2BalanceBefore.discountedBalance, 8); // possible to be Ge or Le 
+        assertApproxEqAbs(
+            inviterinviteeBalanceBefore.hubEscrowBalance,
+            inviterinviteeBalanceBefore.discountedBalance + inviterinvitee2BalanceBefore.discountedBalance,
+            8
+        ); // possible to be Ge or Le
         assertEq(inviterinviteeBalanceBefore.lastUpdatedDay, _day1 + _day2);
-        assertEq(inviterinvitee2BalanceBefore.lastUpdatedDay, _day2); 
+        assertEq(inviterinvitee2BalanceBefore.lastUpdatedDay, _day2);
 
         {
             vm.prank(inviter);
             invitationEscrow.revokeAllInvitations();
 
-
+            // Check the post condition
             invitees = invitationEscrow.getInvitees(inviter);
             address demurrageCircleInviter = LIFTERC20.erc20Circles(CirclesType.Demurrage, inviter);
             DiscountedBalance memory discountedBalance =
@@ -588,19 +613,278 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
 
             assertEq(invitees.length, 0);
             assertLe(
-                discountedBalance.balance, // actual amount of wrap Demurrage ERC20 
+                discountedBalance.balance, // actual amount of wrap Demurrage ERC20
                 inviterinviteeBalanceBefore.discountedBalance + inviterinvitee2BalanceBefore.discountedBalance
             ); // subject to _capToHubBalance
             assertGe(inviterinviteeBalanceAfter.hubEscrowBalance, 0); // subject to _capToHubBalance, the extra token is 'remained' in escrow contract, only in the escrowAmount[inviter][invitee], but is not the actual token
             assertEq(inviterinviteeBalanceAfter.discountedBalance, 0);
             assertEq(inviterinvitee2BalanceAfter.discountedBalance, 0);
             assertEq(inviterinviteeBalanceAfter.hubAccountBalance, 0);
-            assertEq(inviterinviteeBalanceAfter.lastUpdatedDay, _day(block.timestamp));
-            assertEq(inviterinvitee2BalanceAfter.lastUpdatedDay, _day(block.timestamp));
-
-         
+            assertEq(inviterinviteeBalanceAfter.lastUpdatedDay, HUB_V2.day(block.timestamp));
+            assertEq(inviterinvitee2BalanceAfter.lastUpdatedDay, HUB_V2.day(block.timestamp));
         }
     }
+
+    /*//////////////////////////////////////////////////////////////
+                         View function
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Fuzz test for retrieving list of inviters for a given invitee
+    /// @dev Tests linked list management and ordering of inviters
+    /// @param invitee The address of the invitation recipient
+    /// @param inviter1 First inviter address
+    /// @param inviter2 Second inviter address
+    /// @param inviter3 Third inviter address
+    /// @param inviter4 Fourth inviter address
+    /// @param inviter5 Fifth inviter address
+    function testFuzz_getInviters(
+        address invitee,
+        address inviter1,
+        address inviter2,
+        address inviter3,
+        address inviter4,
+        address inviter5
+    ) public {
+        // Invitation must be created before testing getInviters
+
+        vm.assume(
+            invitee != address(0) && inviter1 != address(0) && inviter2 != address(0) && inviter3 != address(0)
+                && inviter4 != address(0) && inviter5 != address(0) && inviter1 != address(HUB_V2)
+                && inviter2 != address(HUB_V2) && inviter3 != address(HUB_V2) && inviter4 != address(HUB_V2)
+                && inviter5 != address(HUB_V2)
+        );
+        uint192 value = 100 ether;
+
+        _registerHuman(inviter1);
+        _registerHuman(inviter2);
+        _registerHuman(inviter3);
+        _registerHuman(inviter4);
+        _registerHuman(inviter5);
+        _setCRCBalance(uint256(uint160(inviter1)), inviter1, HUB_V2.day(block.timestamp), value);
+        _setCRCBalance(uint256(uint160(inviter2)), inviter2, HUB_V2.day(block.timestamp), value);
+        _setCRCBalance(uint256(uint160(inviter3)), inviter3, HUB_V2.day(block.timestamp), value);
+        _setCRCBalance(uint256(uint160(inviter4)), inviter4, HUB_V2.day(block.timestamp), value);
+        _setCRCBalance(uint256(uint160(inviter5)), inviter5, HUB_V2.day(block.timestamp), value);
+
+        address[] memory inviters = invitationEscrow.getInviters(invitee);
+        assertEq(inviters.length, 0);
+
+        vm.startPrank(inviter1);
+        HUB_V2.trust(invitee, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter1, address(invitationEscrow), uint256(uint160(inviter1)), value, abi.encode(invitee)
+        );
+        vm.stopPrank();
+
+        inviters = invitationEscrow.getInviters(invitee);
+        assertEq(inviters.length, 1);
+        assertEq(inviters[0], inviter1);
+
+        vm.startPrank(inviter2);
+        HUB_V2.trust(invitee, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter2, address(invitationEscrow), uint256(uint160(inviter2)), value, abi.encode(invitee)
+        );
+        vm.stopPrank();
+
+        inviters = invitationEscrow.getInviters(invitee);
+        assertEq(inviters.length, 2);
+        assertEq(inviters[0], inviter2);
+        assertEq(inviters[1], inviter1);
+
+        vm.startPrank(inviter3);
+        HUB_V2.trust(invitee, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter3, address(invitationEscrow), uint256(uint160(inviter3)), value, abi.encode(invitee)
+        );
+        vm.stopPrank();
+
+        inviters = invitationEscrow.getInviters(invitee);
+        assertEq(inviters.length, 3);
+        assertEq(inviters[0], inviter3);
+        assertEq(inviters[1], inviter2);
+        assertEq(inviters[2], inviter1);
+
+        vm.startPrank(inviter4);
+        HUB_V2.trust(invitee, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter4, address(invitationEscrow), uint256(uint160(inviter4)), value, abi.encode(invitee)
+        );
+        vm.stopPrank();
+
+        inviters = invitationEscrow.getInviters(invitee);
+        assertEq(inviters.length, 4);
+        assertEq(inviters[0], inviter4);
+        assertEq(inviters[1], inviter3);
+        assertEq(inviters[2], inviter2);
+        assertEq(inviters[3], inviter1);
+
+        vm.startPrank(inviter5);
+        HUB_V2.trust(invitee, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter5, address(invitationEscrow), uint256(uint160(inviter5)), value, abi.encode(invitee)
+        );
+        vm.stopPrank();
+
+        inviters = invitationEscrow.getInviters(invitee);
+        assertEq(inviters.length, 5);
+        assertEq(inviters[0], inviter5);
+        assertEq(inviters[1], inviter4);
+        assertEq(inviters[2], inviter3);
+        assertEq(inviters[3], inviter2);
+        assertEq(inviters[4], inviter1);
+    }
+
+    /// @notice Fuzz test for retrieving list of invitees for a given inviter
+    /// @dev Tests linked list management and ordering of invitees
+    /// @param inviter The address of the invitation creator
+    /// @param invitee1 First invitee address
+    /// @param invitee2 Second invitee address
+    /// @param invitee3 Third invitee address
+    /// @param invitee4 Fourth invitee address
+    /// @param invitee5 Fifth invitee address
+    function testFuzz_getInvitees(
+        address inviter,
+        address invitee1,
+        address invitee2,
+        address invitee3,
+        address invitee4,
+        address invitee5
+    ) public {
+        vm.assume(
+            inviter != address(0) && invitee1 != address(0) && invitee2 != address(0) && invitee3 != address(0)
+                && invitee4 != address(0) && invitee5 != address(0) && invitee1 != address(HUB_V2)
+                && invitee2 != address(HUB_V2) && invitee3 != address(HUB_V2) && invitee4 != address(HUB_V2)
+                && invitee5 != address(HUB_V2)
+        );
+        uint192 value = 100 ether;
+        _registerHuman(inviter);
+        _setCRCBalance(uint256(uint160(inviter)), inviter, HUB_V2.day(block.timestamp), value * 5);
+        address[] memory invitees = invitationEscrow.getInvitees(inviter);
+        assertEq(invitees.length, 0);
+
+        vm.startPrank(inviter);
+
+        HUB_V2.trust(invitee1, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter, address(invitationEscrow), uint256(uint160(inviter)), value, abi.encode(invitee1)
+        );
+
+        invitees = invitationEscrow.getInvitees(inviter);
+        assertEq(invitees.length, 1);
+        assertEq(invitees[0], invitee1);
+
+        HUB_V2.trust(invitee2, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter, address(invitationEscrow), uint256(uint160(inviter)), value, abi.encode(invitee2)
+        );
+
+        invitees = invitationEscrow.getInvitees(inviter);
+
+        assertEq(invitees.length, 2);
+        assertEq(invitees[0], invitee2);
+        assertEq(invitees[1], invitee1);
+
+        HUB_V2.trust(invitee3, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter, address(invitationEscrow), uint256(uint160(inviter)), value, abi.encode(invitee3)
+        );
+
+        invitees = invitationEscrow.getInvitees(inviter);
+
+        assertEq(invitees.length, 3);
+        assertEq(invitees[0], invitee3);
+        assertEq(invitees[1], invitee2);
+        assertEq(invitees[2], invitee1);
+
+        HUB_V2.trust(invitee4, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter, address(invitationEscrow), uint256(uint160(inviter)), value, abi.encode(invitee4)
+        );
+
+        invitees = invitationEscrow.getInvitees(inviter);
+
+        assertEq(invitees.length, 4);
+        assertEq(invitees[0], invitee4);
+        assertEq(invitees[1], invitee3);
+        assertEq(invitees[2], invitee2);
+        assertEq(invitees[3], invitee1);
+
+        HUB_V2.trust(invitee5, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter, address(invitationEscrow), uint256(uint160(inviter)), value, abi.encode(invitee5)
+        );
+
+        invitees = invitationEscrow.getInvitees(inviter);
+
+        assertEq(invitees.length, 5);
+        assertEq(invitees[0], invitee5);
+        assertEq(invitees[1], invitee4);
+        assertEq(invitees[2], invitee3);
+        assertEq(invitees[3], invitee2);
+        assertEq(invitees[4], invitee1);
+
+        vm.stopPrank();
+    }
+
+    /// @notice Fuzz test for retrieving escrowed amount and time-based calculations
+    /// @dev Tests demurrage calculations and time-based balance updates
+    /// @param inviter The address of the invitation creator
+    /// @param invitee The address of the invitation recipient
+    /// @param _day1 First time interval for testing
+    /// @param _day2 Second time interval for testing
+    /// @param _day3 Third time interval for testing
+    function testFuzz_getEscrowedAmountAndDays(
+        address inviter,
+        address invitee,
+        uint64 _day1,
+        uint64 _day2,
+        uint64 _day3
+    ) public {
+        vm.assume(
+            inviter != address(0) && invitee != address(0) && inviter != address(HUB_V2) && invitee != address(HUB_V2)
+        );
+        vm.assume(
+            _day1 > 0 && _day2 > _day1 && _day3 > _day2 && _day3 < 100 * 365
+                && _day1 + _day2 + _day3 <= type(uint64).max
+        );
+
+        uint192 value = 100 ether;
+        _registerHuman(inviter);
+        _setCRCBalance(uint256(uint160(inviter)), inviter, HUB_V2.day(block.timestamp), value);
+
+        vm.startPrank(inviter);
+
+        HUB_V2.trust(invitee, type(uint96).max);
+        HUB_V2.safeTransferFrom(
+            inviter, address(invitationEscrow), uint256(uint160(inviter)), value, abi.encode(invitee)
+        );
+
+        (uint256 escrowAmount, uint64 lastUpdatedDay) = invitationEscrow.getEscrowedAmountAndDays(inviter, invitee);
+        assertEq(escrowAmount, value);
+        assertEq(lastUpdatedDay, 0);
+
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + _day1 * 1 days);
+        (escrowAmount, lastUpdatedDay) = invitationEscrow.getEscrowedAmountAndDays(inviter, invitee);
+        assertEq(escrowAmount, HUB_V2.balanceOf(address(invitationEscrow), uint256(uint160(inviter))));
+        assertEq(lastUpdatedDay, _day1);
+
+        vm.warp(block.timestamp + _day2 * 1 days);
+        (escrowAmount, lastUpdatedDay) = invitationEscrow.getEscrowedAmountAndDays(inviter, invitee);
+        assertEq(escrowAmount, HUB_V2.balanceOf(address(invitationEscrow), uint256(uint160(inviter))));
+        assertEq(lastUpdatedDay, _day2 + _day1);
+
+        vm.warp(block.timestamp + _day3 * 1 days);
+        (escrowAmount, lastUpdatedDay) = invitationEscrow.getEscrowedAmountAndDays(inviter, invitee);
+        assertEq(escrowAmount, HUB_V2.balanceOf(address(invitationEscrow), uint256(uint160(inviter))));
+        assertEq(lastUpdatedDay, _day3 + _day2 + _day1);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                         Internal helper function
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Retrieves comprehensive balance information for inviter-invitee pair
     /// @dev Fetches Hub balances and escrow-specific discounted balance data
@@ -624,16 +908,5 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
     /// @return balance The token balance
     function _getHubBalance(address account, uint256 id) internal view returns (uint256 balance) {
         balance = HUB_V2.balanceOf(account, id);
-    }
-
-    /// @notice Calculates the day number from a timestamp for demurrage calculations
-    /// @dev Computes day index since inflation day zero, used for time-based token calculations
-    /// @param _timestamp The timestamp to convert to day number
-    /// @return Day number as uint64 (safely cast from uint256)
-    function _day(uint256 _timestamp) internal pure returns (uint64) {
-        uint256 INFLATION_DAY_ZERO = 1602720000;
-        uint256 DEMURRAGE_WINDOW = 1 days;
-
-        return uint64((_timestamp - INFLATION_DAY_ZERO) / DEMURRAGE_WINDOW);
     }
 }
