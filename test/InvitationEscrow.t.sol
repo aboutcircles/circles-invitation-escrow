@@ -195,10 +195,10 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             inviters = invitationEscrow.getInviters(invitee);
             invitees = invitationEscrow.getInvitees(inviter);
 
-            assertEq(hubEscrowBalanceAfter.hubEscrowBalance, hubEscrowBalanceBefore.hubEscrowBalance + value);
-            assertEq(hubEscrowBalanceAfter.hubAccountBalance, hubEscrowBalanceBefore.hubAccountBalance - value);
-            assertEq(hubEscrowBalanceAfter.discountedBalance, value);
-            assertEq(hubEscrowBalanceAfter.lastUpdatedDay, 0);
+            assertEq(hubEscrowBalanceAfter.hubEscrowBalance, hubEscrowBalanceBefore.hubEscrowBalance + value); //Escrow balance for inviter increase
+            assertEq(hubEscrowBalanceAfter.hubAccountBalance, hubEscrowBalanceBefore.hubAccountBalance - value); // inviter self balance decrease
+            assertEq(hubEscrowBalanceAfter.discountedBalance, value); // escrowedAmount in escrow contract is value
+            assertEq(hubEscrowBalanceAfter.lastUpdatedDay, 0); // same day as invitation escrow onERC1155Received
             assertEq(invitees.length, 1);
             assertEq(invitees[0], invitee);
             assertEq(inviters.length, 1);
@@ -290,6 +290,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
                 && inviter1 != invitee && inviter2 != invitee
         );
 
+        // In either cases of invalid addresses, should revert InvalidEscrow because onERC1155Received will revert
         if (
             inviter1 == address(0) || inviter1 == address(HUB_V2) || inviter1 == SENTINEL || inviter2 == address(0)
                 || inviter2 == address(HUB_V2) || inviter2 == SENTINEL || inviter1 == address(invitationEscrow)
@@ -405,17 +406,17 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             assertLe(
                 inviter1inviteeAfter.hubEscrowBalance,
                 inviter1inviteeBefore.hubEscrowBalance - inviter1inviteeBefore.discountedBalance
-            );
+            ); // subject to _capToHubBalance
             assertLe(
                 inviter2inviteeAfter.hubEscrowBalance,
                 inviter2inviteeBefore.hubEscrowBalance - inviter2inviteeBefore.discountedBalance
-            );
-            assertEq(inviter1inviteeAfter.hubAccountBalance, inviter1inviteeBefore.hubAccountBalance);
+            ); // subject to _capToHubBalance
+            assertEq(inviter1inviteeAfter.hubAccountBalance, inviter1inviteeBefore.hubAccountBalance); // inviter1's self balance(ERC1155) is the same and get demurrage ERC20 in return
             assertLe(
                 inviter2inviteeAfter.hubAccountBalance,
                 inviter2inviteeBefore.hubAccountBalance + inviter2inviteeBefore.discountedBalance
-            );
-            assertLe(inviter1inviteeBefore.discountedBalance, uint256(discountedBalance.balance));
+            ); // inviter2's self balance(ERC1155) increase, the amount <= discountedBalance as subject to _capToHubBalance
+            assertLe(inviter1inviteeBefore.discountedBalance, uint256(discountedBalance.balance)); // inviter1 gets demurrage ERC20, the amount <= discountedBalance as subject to _capToHubBalance
 
             inviters = invitationEscrow.getInviters(invitee);
             assertEq(inviters.length, 0);
@@ -548,7 +549,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
                 && invitee != address(0) && invitee2 != address(0) && invitee != invitee2 && inviter != invitee
                 && inviter != invitee2
         );
-        vm.assume(_day1 < _day2 && _day1 > 0 && _day2 < 100 * 365);
+        vm.assume(_day1 > 0 && _day1 < _day2 && _day2 < 100 * 365);
 
         uint192 value = 100 ether;
 
@@ -590,7 +591,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
         HubAndEscrowBalances memory inviterinviteeBalanceBefore = _getHubEscrowBalance(inviter, invitee);
         HubAndEscrowBalances memory inviterinvitee2BalanceBefore = _getHubEscrowBalance(inviter, invitee2);
 
-        assertEq(inviterinviteeBalanceBefore.hubEscrowBalance, inviterinvitee2BalanceBefore.hubEscrowBalance);
+        assertEq(inviterinviteeBalanceBefore.hubEscrowBalance, inviterinvitee2BalanceBefore.hubEscrowBalance); // from HUB's POV, escrow's balance for inviter is the same regardless of which invitee
         assertApproxEqAbs(
             inviterinviteeBalanceBefore.hubEscrowBalance,
             inviterinviteeBalanceBefore.discountedBalance + inviterinvitee2BalanceBefore.discountedBalance,
@@ -651,8 +652,17 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             invitee != address(0) && inviter1 != address(0) && inviter2 != address(0) && inviter3 != address(0)
                 && inviter4 != address(0) && inviter5 != address(0) && inviter1 != address(HUB_V2)
                 && inviter2 != address(HUB_V2) && inviter3 != address(HUB_V2) && inviter4 != address(HUB_V2)
-                && inviter5 != address(HUB_V2)
+                && inviter5 != address(HUB_V2) && invitee != SENTINEL && inviter1 != SENTINEL && inviter2 != SENTINEL
+                && inviter3 != SENTINEL && inviter4 != SENTINEL
         );
+        if (
+            inviter1 == inviter2 || inviter1 == inviter3 || inviter1 == inviter4 || inviter1 == inviter5
+                || inviter2 == inviter3 || inviter2 == inviter4 || inviter2 == inviter5 || inviter3 == inviter4
+                || inviter3 == inviter5 || inviter4 == inviter5
+        ) {
+            return;
+        }
+
         uint192 value = 100 ether;
 
         _registerHuman(inviter1);
@@ -755,8 +765,16 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             inviter != address(0) && invitee1 != address(0) && invitee2 != address(0) && invitee3 != address(0)
                 && invitee4 != address(0) && invitee5 != address(0) && invitee1 != address(HUB_V2)
                 && invitee2 != address(HUB_V2) && invitee3 != address(HUB_V2) && invitee4 != address(HUB_V2)
-                && invitee5 != address(HUB_V2)
+                && invitee5 != address(HUB_V2) && inviter != SENTINEL && invitee1 != SENTINEL && invitee2 != SENTINEL
+                && invitee3 != SENTINEL && invitee4 != SENTINEL
         );
+        if (
+            invitee1 == invitee2 || invitee1 == invitee3 || invitee1 == invitee4 || invitee1 == invitee5
+                || invitee2 == invitee3 || invitee2 == invitee4 || invitee2 == invitee5 || invitee3 == invitee4
+                || invitee3 == invitee5 || invitee4 == invitee5
+        ) {
+            return;
+        }
         uint192 value = 100 ether;
         _registerHuman(inviter);
         _setCRCBalance(uint256(uint160(inviter)), inviter, HUB_V2.day(block.timestamp), value * 5);
