@@ -155,9 +155,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             vm.prank(inviter);
             vm.expectRevert(InvitationEscrow.InviteeAlreadyRegistered.selector);
 
-            HUB_V2.safeTransferFrom(
-                inviter, address(invitationEscrow), uint256(inviterId), value, abi.encode(invitee)
-            );
+            HUB_V2.safeTransferFrom(inviter, address(invitationEscrow), uint256(inviterId), value, abi.encode(invitee));
         }
 
         if (invitee == address(0)) {
