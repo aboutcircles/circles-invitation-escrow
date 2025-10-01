@@ -210,10 +210,10 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             HUB_V2.safeTransferFrom(inviter, address(invitationEscrow), uint256(inviterId), value, abi.encode(invitee));
             vm.stopPrank();
 
-            // Ensure inviter is an EOA
+            // Ensure inviter & invitee is an EOA
             // invitee address can be invitationEscrow, but will revert later
 
-            vm.assume(inviter.code.length == 0);
+            vm.assume(inviter.code.length == 0 && invitee.code.length == 0);
 
             vm.startPrank(invitee);
 
@@ -656,7 +656,8 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
         if (
             inviter1 == inviter2 || inviter1 == inviter3 || inviter1 == inviter4 || inviter1 == inviter5
                 || inviter2 == inviter3 || inviter2 == inviter4 || inviter2 == inviter5 || inviter3 == inviter4
-                || inviter3 == inviter5 || inviter4 == inviter5
+                || inviter3 == inviter5 || inviter4 == inviter5 || invitee == inviter1 || invitee == inviter2
+                || invitee == inviter3 || invitee == inviter4 || invitee == inviter5
         ) {
             return;
         }
@@ -769,7 +770,8 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
         if (
             invitee1 == invitee2 || invitee1 == invitee3 || invitee1 == invitee4 || invitee1 == invitee5
                 || invitee2 == invitee3 || invitee2 == invitee4 || invitee2 == invitee5 || invitee3 == invitee4
-                || invitee3 == invitee5 || invitee4 == invitee5
+                || invitee3 == invitee5 || invitee4 == invitee5 || inviter == invitee1 || inviter == invitee2
+                || inviter == invitee3 || inviter == invitee4 || inviter == invitee5 
         ) {
             return;
         }
