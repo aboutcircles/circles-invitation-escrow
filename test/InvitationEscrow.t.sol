@@ -100,6 +100,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
         vm.assume(
             inviter != address(this) && invitee != address(this) && inviter != SENTINEL && invitee != SENTINEL
                 && inviter != address(0) && inviter != address(HUB_V2) && invitee != address(HUB_V2)
+                && inviter != address(invitationEscrow) && invitee != address(invitationEscrow)
         );
 
         _setCRCBalance(uint256(inviterId), inviter, HUB_V2.day(block.timestamp), value);
@@ -651,7 +652,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
                 && inviter4 != address(0) && inviter5 != address(0) && inviter1 != address(HUB_V2)
                 && inviter2 != address(HUB_V2) && inviter3 != address(HUB_V2) && inviter4 != address(HUB_V2)
                 && inviter5 != address(HUB_V2) && invitee != SENTINEL && inviter1 != SENTINEL && inviter2 != SENTINEL
-                && inviter3 != SENTINEL && inviter4 != SENTINEL
+                && inviter3 != SENTINEL && inviter4 != SENTINEL && inviter5 != SENTINEL
         );
         if (
             inviter1 == inviter2 || inviter1 == inviter3 || inviter1 == inviter4 || inviter1 == inviter5
