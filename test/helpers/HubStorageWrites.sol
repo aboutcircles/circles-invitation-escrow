@@ -44,6 +44,7 @@ contract HubStorageWrites is Test {
     function _registerHuman(address account) internal {
         _insertAvatar(account);
         _setMintTime(account);
+        _setTrust(account, account);
     }
 
     function _setOperatorApproval(address account, address operator) internal {

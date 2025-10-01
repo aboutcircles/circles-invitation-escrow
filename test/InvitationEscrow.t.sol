@@ -771,7 +771,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites {
             invitee1 == invitee2 || invitee1 == invitee3 || invitee1 == invitee4 || invitee1 == invitee5
                 || invitee2 == invitee3 || invitee2 == invitee4 || invitee2 == invitee5 || invitee3 == invitee4
                 || invitee3 == invitee5 || invitee4 == invitee5 || inviter == invitee1 || inviter == invitee2
-                || inviter == invitee3 || inviter == invitee4 || inviter == invitee5 
+                || inviter == invitee3 || inviter == invitee4 || inviter == invitee5
         ) {
             return;
         }
