@@ -15,7 +15,7 @@ import {MockReentrantReceiver} from "./mock/MockReentrantReceiver.sol";
 /// @dev Uncovered branches:
 ///      1. nonReentrant modifier: if tload(0) { revert(0, 0) }
 ///      2. _removeInvitation: if (previousElement == address(0)) {
-contract InvitationEscrowForkTest is Test, HubStorageWrites {
+contract InvitationEscrowTest is Test, HubStorageWrites {
     /// @notice Struct containing balance information for testing escrow and Hub interactions
     /// @dev Aggregates all relevant balance data for comprehensive testing scenarios
     struct HubAndEscrowBalances {
@@ -840,6 +840,7 @@ contract InvitationEscrowForkTest is Test, HubStorageWrites {
     ) public {
         vm.assume(
             inviter != address(0) && invitee != address(0) && inviter != address(HUB_V2) && invitee != address(HUB_V2)
+                && inviter != SENTINEL && invitee != SENTINEL
         );
         vm.assume(
             _day1 > 0 && _day2 > _day1 && _day3 > _day2 && _day3 < 100 * 365
