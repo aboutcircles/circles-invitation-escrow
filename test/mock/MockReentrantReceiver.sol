@@ -10,14 +10,14 @@ interface IERC1155Receiver {
 }
 
 contract MockReentrantReceiver {
-    address inivtationEscrow;
+    address invitationEscrow;
 
     constructor(address _invitationEscrow) {
-        inivtationEscrow = _invitationEscrow;
+        invitationEscrow = _invitationEscrow;
     }
 
     function onERC1155Received(address, address, uint256, uint256, bytes calldata) external returns (bytes4) {
-        IERC1155Receiver(inivtationEscrow).redeemInvitation(address(this));
+        IERC1155Receiver(invitationEscrow).redeemInvitation(address(this));
 
         return bytes4(keccak256("onERC1155Received(address,address,uint256,uint256,bytes)"));
     }
