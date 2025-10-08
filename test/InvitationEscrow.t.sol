@@ -6,7 +6,7 @@ import {HubStorageWrites} from "test/helpers/HubStorageWrites.sol";
 import {InvitationEscrow} from "src/InvitationEscrow.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
 import {MockReentrantReceiver} from "./mock/MockReentrantReceiver.sol";
-import {CircleV2Setup} from "./helpers/CircleV2Setup.sol";
+import {CirclesV2Setup} from "./helpers/CirclesV2Setup.sol";
 
 /// @title InvitationEscrowTest
 /// @notice Comprehensive test suite for InvitationEscrow contract
@@ -14,7 +14,7 @@ import {CircleV2Setup} from "./helpers/CircleV2Setup.sol";
 /// @dev Uncovered branches:
 ///      1. nonReentrant modifier: if tload(0) { revert(0, 0) }
 ///      2. _removeInvitation: if (previousElement == address(0)) {
-contract InvitationEscrowTest is Test, HubStorageWrites, CircleV2Setup {
+contract InvitationEscrowTest is Test, HubStorageWrites, CirclesV2Setup {
     /// @notice Struct containing balance information for testing escrow and Hub interactions
     /// @dev Aggregates all relevant balance data for comprehensive testing scenarios
     struct HubAndEscrowBalances {

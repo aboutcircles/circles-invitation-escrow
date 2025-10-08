@@ -2,15 +2,102 @@
 pragma solidity ^0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
-import {IHub} from "../interfaces/IHubV2.sol";
-import {IERC20Lift} from "../interfaces/IERC20Lift.sol";
-import {IHubV1} from "../interfaces/IHubV1.sol";
-import {INameRegistry} from "../interfaces/INameRegistry.sol";
+import {IHubV2} from "circles-contracts-v2/hub/IHub.sol";
 
-/// @title CircleV2Setup
+interface IHub is IHubV2 {
+    function day(uint256 _timestamp) external view returns (uint64);
+    function wrap(address _avatar, uint256 _amount, uint8 _type) external returns (address);
+    function convertInflationaryToDemurrageValue(uint256 _inflationaryValue, uint64 _day)
+        external
+        pure
+        returns (uint256);
+    function convertDemurrageToInflationaryValue(uint256 _demurrageValue, uint64 _dayUpdated)
+        external
+        pure
+        returns (uint256);
+    function registerOrganization(string calldata _name, bytes32 _metadataDigest) external;
+    function trust(address _trustReceiver, uint96 _expiry) external;
+    function registerHuman(address _inviter, bytes32 _metadataDigest) external;
+    function isTrusted(address _truster, address _trustee) external view returns (bool);
+    function avatars(address account) external view returns (address);
+}
+
+interface IERC20Lift {
+    // enum CirclesType {
+    //     Demurrage, // 0
+    //     Inflation // 1
+    // }
+
+    type CirclesType is uint8;
+
+    error CirclesAmountOverflow(uint256 amount, uint8 code);
+    error CirclesErrorAddressUintArgs(address, uint256, uint8);
+    error CirclesErrorNoArgs(uint8);
+    error CirclesErrorOneAddressArg(address, uint8);
+    error CirclesIdMustBeDerivedFromAddress(uint256 providedId, uint8 code);
+    error CirclesInvalidCirclesId(uint256 id, uint8 code);
+    error CirclesInvalidParameter(uint256 parameter, uint8 code);
+    error CirclesProxyAlreadyInitialized();
+    error CirclesReentrancyGuard(uint8 code);
+
+    event ERC20WrapperDeployed(address indexed avatar, address indexed erc20Wrapper, uint8 circlesType);
+    event ProxyCreation(address proxy, address masterCopy);
+
+    function ERC20_WRAPPER_SETUP_CALLPREFIX() external view returns (bytes4);
+    function ensureERC20(address _avatar, uint8 _circlesType) external returns (address);
+    function erc20Circles(uint8, address) external view returns (address);
+    function hub() external view returns (address);
+    function masterCopyERC20Wrapper(uint256) external view returns (address);
+    function nameRegistry() external view returns (address);
+}
+
+/**
+ * @title IHub v1
+ * @author Circles
+ * @notice legacy interface of Hub contract in Circles v1
+ */
+interface IHubV1 {
+    function signup() external;
+    function signupBonus() external view returns (uint256);
+    function organizationSignup() external;
+    function symbol() external view returns (string memory);
+    function name() external view returns (string memory);
+
+    function tokenToUser(address token) external view returns (address);
+    function userToToken(address user) external view returns (address);
+    function limits(address truster, address trustee) external returns (uint256);
+
+    function trust(address trustee, uint256 limit) external;
+
+    function deployedAt() external view returns (uint256);
+    function initialIssuance() external view returns (uint256);
+    function issuance() external view returns (uint256);
+    function issuanceByStep(uint256 periods) external view returns (uint256);
+    function inflate(uint256 initial, uint256 periods) external view returns (uint256);
+    function inflation() external view returns (uint256);
+    function divisor() external view returns (uint256);
+    function period() external view returns (uint256);
+    function periods() external view returns (uint256);
+    function timeout() external view returns (uint256);
+}
+
+interface INameRegistry {
+    function setMetadataDigest(address avatar, bytes32 metadataDigest) external;
+    function registerCustomName(address avatar, string calldata name) external;
+    function registerCustomSymbol(address avatar, string calldata symbol) external;
+
+    function name(address avatar) external view returns (string memory);
+    function symbol(address avatar) external view returns (string memory);
+    function getMetadataDigest(address _avatar) external view returns (bytes32);
+
+    function isValidName(string calldata name) external pure returns (bool);
+    function isValidSymbol(string calldata symbol) external pure returns (bool);
+}
+
+/// @title CirclesV2Setup
 /// @notice Setup contracts for CircleV2 that developer can import from
 /// @dev All revelant contracts deployedbyteocde and initial state after deployment
-contract CircleV2Setup is Test {
+contract CirclesV2Setup is Test {
     struct KeyValuePair {
         bytes32 key;
         bytes32 value;
