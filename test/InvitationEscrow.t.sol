@@ -395,8 +395,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites, CircleV2Setup {
             invitationEscrow.redeemInvitation(inviter2);
 
             address demurrageCircleInviter1 = ERC20LIFT.erc20Circles(uint8(0), inviter1);
-            uint256 demurrageCircleDiscountedBalance =
-                IERC20(demurrageCircleInviter1).balanceOf(inviter1);
+            uint256 demurrageCircleDiscountedBalance = IERC20(demurrageCircleInviter1).balanceOf(inviter1);
             HubAndEscrowBalances memory inviter1inviteeAfter = _getHubEscrowBalance(inviter1, invitee);
             HubAndEscrowBalances memory inviter2inviteeAfter = _getHubEscrowBalance(inviter2, invitee);
 
@@ -514,8 +513,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites, CircleV2Setup {
         }
 
         address demurrageCircleInviter1 = ERC20LIFT.erc20Circles(uint8(0), inviter);
-        uint256 demurrageCircleDiscountedBalance =
-            IERC20(demurrageCircleInviter1).balanceOf(inviter);
+        uint256 demurrageCircleDiscountedBalance = IERC20(demurrageCircleInviter1).balanceOf(inviter);
 
         assertEq(inviter1inviteeAfter.escrowedBalance, demurrageCircleDiscountedBalance);
         assertEq(inviter1inviteeAfter.hubEscrowBalance, demurrageCircleDiscountedBalance);
@@ -609,8 +607,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites, CircleV2Setup {
             // Check the post condition
             invitees = invitationEscrow.getInvitees(inviter);
             address demurrageCircleInviter = ERC20LIFT.erc20Circles(uint8(0), inviter);
-            uint256 demurrageCircleDiscountedBalance =
-                IERC20(demurrageCircleInviter).balanceOf(inviter);
+            uint256 demurrageCircleDiscountedBalance = IERC20(demurrageCircleInviter).balanceOf(inviter);
             HubAndEscrowBalances memory inviterinviteeBalanceAfter = _getHubEscrowBalance(inviter, invitee);
             HubAndEscrowBalances memory inviterinvitee2BalanceAfter = _getHubEscrowBalance(inviter, invitee2);
 
