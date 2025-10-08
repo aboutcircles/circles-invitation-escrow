@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {Test, console} from "forge-std/Test.sol";
 import {HubStorageWrites} from "test/helpers/HubStorageWrites.sol";
 import {InvitationEscrow} from "src/InvitationEscrow.sol";
-import {IDemurrageCircles, DiscountedBalance} from "./interfaces/IDemurrageCircles.sol";
+import {IERC20} from "./interfaces/IERC20.sol";
 import {MockReentrantReceiver} from "./mock/MockReentrantReceiver.sol";
 import {CircleV2Setup} from "./helpers/CircleV2Setup.sol";
 
@@ -395,8 +395,8 @@ contract InvitationEscrowTest is Test, HubStorageWrites, CircleV2Setup {
             invitationEscrow.redeemInvitation(inviter2);
 
             address demurrageCircleInviter1 = ERC20LIFT.erc20Circles(uint8(0), inviter1);
-            DiscountedBalance memory demurrageCircleDiscountedBalance =
-                IDemurrageCircles(demurrageCircleInviter1).discountedBalances(inviter1);
+            uint256 demurrageCircleDiscountedBalance =
+                IERC20(demurrageCircleInviter1).balanceOf(inviter1);
             HubAndEscrowBalances memory inviter1inviteeAfter = _getHubEscrowBalance(inviter1, invitee);
             HubAndEscrowBalances memory inviter2inviteeAfter = _getHubEscrowBalance(inviter2, invitee);
 
@@ -419,7 +419,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites, CircleV2Setup {
                 inviter2inviteeAfter.hubAccountBalance,
                 inviter2inviteeBefore.hubAccountBalance + inviter2inviteeBefore.escrowedBalance
             ); // inviter2's self balance(ERC1155) increase, the amount is subject to _capToHubBalance
-            assertEq(inviter1inviteeBefore.escrowedBalance, uint256(demurrageCircleDiscountedBalance.balance)); // inviter1 gets demurrage ERC20
+            assertEq(inviter1inviteeBefore.escrowedBalance, demurrageCircleDiscountedBalance); // inviter1 gets demurrage ERC20
 
             if (inviter2inviteeAfter.hubAccountBalance < INVITATION_COST) {
                 vm.prank(invitee);
@@ -514,11 +514,11 @@ contract InvitationEscrowTest is Test, HubStorageWrites, CircleV2Setup {
         }
 
         address demurrageCircleInviter1 = ERC20LIFT.erc20Circles(uint8(0), inviter);
-        DiscountedBalance memory demurrageCircleDiscountedBalance =
-            IDemurrageCircles(demurrageCircleInviter1).discountedBalances(inviter);
+        uint256 demurrageCircleDiscountedBalance =
+            IERC20(demurrageCircleInviter1).balanceOf(inviter);
 
-        assertEq(inviter1inviteeAfter.escrowedBalance, demurrageCircleDiscountedBalance.balance);
-        assertEq(inviter1inviteeAfter.hubEscrowBalance, demurrageCircleDiscountedBalance.balance);
+        assertEq(inviter1inviteeAfter.escrowedBalance, demurrageCircleDiscountedBalance);
+        assertEq(inviter1inviteeAfter.hubEscrowBalance, demurrageCircleDiscountedBalance);
         assertEq(inviter1inviteeAfter.hubAccountBalance, 0);
         assertEq(inviter1inviteeAfter.lastUpdatedDay, _days);
         inviters = invitationEscrow.getInviters(invitee);
@@ -609,14 +609,14 @@ contract InvitationEscrowTest is Test, HubStorageWrites, CircleV2Setup {
             // Check the post condition
             invitees = invitationEscrow.getInvitees(inviter);
             address demurrageCircleInviter = ERC20LIFT.erc20Circles(uint8(0), inviter);
-            DiscountedBalance memory demurrageCircleDiscountedBalance =
-                IDemurrageCircles(demurrageCircleInviter).discountedBalances(inviter);
+            uint256 demurrageCircleDiscountedBalance =
+                IERC20(demurrageCircleInviter).balanceOf(inviter);
             HubAndEscrowBalances memory inviterinviteeBalanceAfter = _getHubEscrowBalance(inviter, invitee);
             HubAndEscrowBalances memory inviterinvitee2BalanceAfter = _getHubEscrowBalance(inviter, invitee2);
 
             assertEq(invitees.length, 0);
             assertLe(
-                demurrageCircleDiscountedBalance.balance, // actual amount of wrap Demurrage ERC20
+                demurrageCircleDiscountedBalance, // actual amount of wrap Demurrage ERC20
                 inviterinviteeBalanceBefore.escrowedBalance + inviterinvitee2BalanceBefore.escrowedBalance
             ); // subject to _capToHubBalance. The actual wrapped Demurrage ERC20 received by inviter should be not more than the available balance in HUB
             assertGe(inviterinviteeBalanceAfter.hubEscrowBalance, 0); //subject to _capToHubBalance, the extra token is 'remained' in escrow contract, if revokedAmount < balance
@@ -631,6 +631,7 @@ contract InvitationEscrowTest is Test, HubStorageWrites, CircleV2Setup {
     /*//////////////////////////////////////////////////////////////
                          View function
     //////////////////////////////////////////////////////////////*/
+    /// @dev View function test can be improved by fuzzing array length and address, i.e. https://github.com/aboutcircles/circles-groups/blob/develop/test/base-group/helpers/FlowMatrixGenerator.sol#L54-L66
 
     /// @notice Fuzz test for retrieving list of inviters for a given invitee
     /// @dev Tests linked list management and ordering of inviters
