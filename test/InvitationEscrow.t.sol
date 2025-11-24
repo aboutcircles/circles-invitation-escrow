@@ -284,8 +284,8 @@ contract InvitationEscrowTest is Test, HubStorageWrites, CirclesV2Setup {
 
         vm.assume(
             invitee != SENTINEL && invitee != address(HUB_V2) && invitee != address(0) && inviter1 != inviter2
-                && inviter1 != invitee && inviter2 != invitee && inviter1 != INFLATION_ERC20 && inviter2 != INFLATION_ERC20
-                && inviter1 != DEMURRAGE_ERC20 && inviter2 != DEMURRAGE_ERC20
+                && inviter1 != invitee && inviter2 != invitee && inviter1 != INFLATION_ERC20
+                && inviter2 != INFLATION_ERC20 && inviter1 != DEMURRAGE_ERC20 && inviter2 != DEMURRAGE_ERC20
         );
 
         // In either cases of invalid addresses, should revert InvalidEscrow because onERC1155Received will revert
